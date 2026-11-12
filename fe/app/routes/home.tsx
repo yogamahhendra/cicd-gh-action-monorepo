@@ -102,6 +102,14 @@ export default function Home() {
     }
   };
 
+  const handleClearCompleted = () => {
+    const completedTasks = tasks.filter((t) => t.is_completed);
+    setTasks((prev) => prev.filter((t) => !t.is_completed));
+    completedTasks.forEach((task) => {
+      fetch(`${API_BASE}/tasks/${task.id}`, { method: "DELETE" }).catch(() => {});
+    });
+  };
+
   return (
     <main className="min-h-screen bg-slate-900 text-slate-100 p-6 flex flex-col items-center">
       <div className="w-full max-w-xl">
@@ -172,9 +180,20 @@ export default function Home() {
           )}
         </div>
 
-        <div className="mt-6 p-4 bg-slate-800/60 border border-slate-700/60 rounded-lg text-xs text-slate-400 flex justify-between">
-          <span>Total: {tasks.length}</span>
-          <span>Selesai: {tasks.filter((t) => t.is_completed).length}</span>
+        <div className="mt-6 p-4 bg-slate-800/60 border border-slate-700/60 rounded-lg text-xs text-slate-400 flex items-center justify-between">
+          <div className="flex gap-4">
+            <span>Total: {tasks.length}</span>
+            <span>Selesai: {tasks.filter((t) => t.is_completed).length}</span>
+          </div>
+          {tasks.some((t) => t.is_completed) && (
+            <button
+              type="button"
+              onClick={handleClearCompleted}
+              className="text-amber-400 hover:text-amber-300 font-medium transition cursor-pointer"
+            >
+              Hapus Selesai
+            </button>
+          )}
         </div>
       </div>
     </main>
