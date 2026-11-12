@@ -57,3 +57,9 @@ test('can delete a task', function () {
     $response->assertStatus(200);
     $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
 });
+
+test('returns 404 when deleting non-existent task', function () {
+    $response = $this->deleteJson('/api/tasks/99999');
+
+    $response->assertStatus(404);
+});
