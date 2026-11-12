@@ -57,4 +57,3 @@ test('can delete a task', function () {
     $response->assertStatus(200);
     $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
 });
-
