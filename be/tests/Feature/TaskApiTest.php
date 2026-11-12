@@ -63,3 +63,11 @@ test('returns 404 when deleting non-existent task', function () {
 
     $response->assertStatus(404);
 });
+
+test('returns 404 when updating non-existent task', function () {
+    $response = $this->putJson('/api/tasks/99999', [
+        'title' => 'Updated non-existent',
+    ]);
+
+    $response->assertStatus(404);
+});
