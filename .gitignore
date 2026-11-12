@@ -1,0 +1,24 @@
+# Monorepo root ignores
+.DS_Store
+Thumbs.db
+
+# Backend (Laravel)
+be/vendor/
+be/.env
+be/.env.backup
+be/.env.production
+be/storage/*.key
+be/storage/logs/
+be/storage/framework/cache/
+be/storage/framework/sessions/
+be/storage/framework/views/
+be/database/*.sqlite
+be/database/*.sqlite-journal
+
+# Frontend (React Router)
+fe/node_modules/
+fe/.react-router/
+fe/build/
+fe/.env
+fe/.env.local
+
