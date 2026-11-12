@@ -1,0 +1,94 @@
+name: Production CD (via NetBird & SSH)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Memungkinkan trigger manual lewat tombol "Run workflow" di GitHub Actions
+
+jobs:
+  # 1. Deteksi folder yang berubah di monorepo
+  detect-changes:
+    name: Detect Changed Folders
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Filter Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'be/**'
+              - '.github/workflows/deploy.yml'
+            frontend:
+              - 'fe/**'
+              - '.github/workflows/deploy.yml'
+
+  # 2. Deploy ke Server via NetBird & SSH
+  deploy:
+    name: Deploy to Private Server
+    needs: detect-changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Hubungkan runner GitHub Actions ke NetBird VPN Mesh
+      - name: Connect to NetBird Mesh
+        run: |
+          echo "Installing NetBird client..."
+          curl -fsSL https://pkgs.netbird.io/install.sh | sudo sh
+          echo "Connecting to NetBird..."
+          sudo netbird up --setup-key ${{ secrets.NETBIRD_SETUP_KEY }}
+          echo "Checking NetBird connection status..."
+          netbird status
+
+      # Cek jangkauan jaringan ke server
+      - name: Verify Network Reachability
+        run: |
+          ping -c 3 ${{ secrets.SSH_HOST }} || echo "Ping skipped/blocked, continuing to SSH..."
+
+      # Eksekusi deployment via SSH
+      - name: Execute Deploy Commands via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop_on_error: true
+          script: |
+            set -e
+            echo "=== 1. Pulling Latest Code ==="
+            cd /var/www/cicd-gh-action-monorepo
+            git pull origin main
+
+            # Deploy Backend jika ada perubahan di be/ atau trigger manual
+            if [ "${{ needs.detect-changes.outputs.backend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "=== 2. Deploying Backend (Laravel) ==="
+              cd /var/www/cicd-gh-action-monorepo/be
+              composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+              php artisan migrate --force
+              php artisan config:cache
+              php artisan route:cache
+              php artisan view:cache
+              sudo systemctl reload php8.3-fpm || echo "PHP-FPM reloaded"
+            fi
+
+            # Deploy Frontend jika ada perubahan di fe/ atau trigger manual
+            if [ "${{ needs.detect-changes.outputs.frontend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "=== 3. Deploying Frontend (React Router) ==="
+              cd /var/www/cicd-gh-action-monorepo/fe
+              npm ci
+              npm run build
+              PORT=3001 pm2 reload fe-app --update-env || PORT=3001 pm2 start "npm start" --name "fe-app"
+              pm2 save
+            fi
+
+            echo "=== Deployment Completed Successfully! ==="
