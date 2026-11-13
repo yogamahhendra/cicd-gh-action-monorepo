@@ -205,7 +205,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-purple-900/60 text-purple-300 rounded font-mono text-[11px]">FE</span>
-            <span>Testing perubahan di 13 Nov 2026 Jam 10.28</span>
+            <span>Testing perubahan di 13 Nov 2026 Jam 10.57</span>
           </div>
         </div>
       </div>
