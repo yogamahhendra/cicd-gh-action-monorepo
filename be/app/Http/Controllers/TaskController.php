@@ -14,6 +14,7 @@ class TaskController extends Controller
         $lastModified = Carbon::createFromTimestamp(filemtime(__FILE__))
             ->timezone(config('app.timezone', 'UTC'))
             ->translatedFormat('d M Y \J\a\m H:i');
+        $testing = 'testing';
 
         return response()->json([
             'data' => Task::latest()->get(),
