@@ -12,7 +12,10 @@ test('can list all tasks', function () {
     $response = $this->getJson('/api/tasks');
 
     $response->assertStatus(200)
-        ->assertJsonCount(2);
+        ->assertJsonCount(2, 'data')
+        ->assertJsonStructure(['data', 'changes' => ['message']]);
+
+    expect($response->json('changes.message'))->toContain('testing perubahan di');
 });
 
 test('can create a new task', function () {

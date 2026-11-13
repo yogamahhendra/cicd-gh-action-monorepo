@@ -5,12 +5,22 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class TaskController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(Task::latest()->get());
+        $lastModified = Carbon::createFromTimestamp(filemtime(__FILE__))
+            ->timezone(config('app.timezone', 'UTC'))
+            ->translatedFormat('d M Y \J\a\m H:i');
+
+        return response()->json([
+            'data' => Task::latest()->get(),
+            'changes' => [
+                'message' => 'testing perubahan di ' . $lastModified,
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse
