@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Route } from "./+types/home";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Task Manager - CI/CD Monorepo" },
     { name: "description", content: "Sample Task App for CI/CD Testing" },
@@ -108,7 +108,7 @@ export default function Home() {
     const completedTasks = tasks.filter((t) => t.is_completed);
     setTasks((prev) => prev.filter((t) => !t.is_completed));
     completedTasks.forEach((task) => {
-      fetch(`${API_BASE}/tasks/${task.id}`, { method: "DELETE" }).catch(() => {});
+      fetch(`${API_BASE}/tasks/${task.id}`, { method: "DELETE" }).catch(() => { });
     });
   };
 
@@ -161,11 +161,10 @@ export default function Home() {
                     className="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-600 focus:ring-0"
                   />
                   <span
-                    className={`text-sm ${
-                      task.is_completed
+                    className={`text-sm ${task.is_completed
                         ? "line-through text-slate-500"
                         : "text-slate-200"
-                    }`}
+                      }`}
                   >
                     {task.title}
                   </span>
@@ -207,6 +206,9 @@ export default function Home() {
             <span className="px-2 py-0.5 bg-purple-900/60 text-purple-300 rounded font-mono text-[11px]">FE</span>
             <span>Testing perubahan di 13 Nov 2026 Jam 10.57</span>
           </div>
+        </div>
+        <div>
+          <p>Test Pull Request</p>
         </div>
       </div>
     </main>
