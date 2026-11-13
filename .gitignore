@@ -17,3 +17,6 @@ fe/.react-router/
 fe/build/
 fe/.env
 fe/.env.local
+
+# backup file
+.github-workflow-bak

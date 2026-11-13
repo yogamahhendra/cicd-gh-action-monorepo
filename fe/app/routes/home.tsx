@@ -18,19 +18,21 @@ interface Task {
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, title: "Setup GitHub Actions CI/CD", is_completed: true },
-    { id: 2, title: "Configure Monorepo Path Filtering", is_completed: false },
-    { id: 3, title: "Run Automated Tests on PR", is_completed: false },
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [serverMessage, setServerMessage] = useState<string>("");
 
   useEffect(() => {
     fetch(`${API_BASE}/tasks`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: Task[] | null) => {
-        if (data && Array.isArray(data)) {
+      .then((data: any) => {
+        if (data && Array.isArray(data.data)) {
+          setTasks(data.data);
+          if (data.changes?.message) {
+            setServerMessage(data.changes.message);
+          }
+        } else if (Array.isArray(data)) {
           setTasks(data);
         }
       })
@@ -194,6 +196,17 @@ export default function Home() {
               Hapus Selesai
             </button>
           )}
+        </div>
+        <div className="mt-6 p-4 bg-slate-800/60 border border-slate-700/60 rounded-lg text-xs text-slate-300 space-y-2">
+          <p className="font-semibold text-slate-200 text-sm">Log Perubahan</p>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-blue-900/60 text-blue-300 rounded font-mono text-[11px]">BE</span>
+            <span>{serverMessage || "Memuat pesan dari backend..."}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-purple-900/60 text-purple-300 rounded font-mono text-[11px]">FE</span>
+            <span>Testing perubahan di 13 Nov 2026 Jam 10.28</span>
+          </div>
         </div>
       </div>
     </main>

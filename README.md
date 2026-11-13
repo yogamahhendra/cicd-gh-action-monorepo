@@ -10,7 +10,7 @@ A modern full-stack monorepo featuring **React Router v7** (SSR/SPA) on the fron
 cicd-gh-action-monorepo/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml             # Monorepo CI workflow with path-filtering
+│       └── ci-cd.yml          # Unified Monorepo CI/CD workflow (NetBird & SSH)
 ├── be/                        # Backend: Laravel 12 API
 │   ├── app/
 │   │   ├── Http/Controllers/ # TaskController.php (CRUD API)
@@ -38,7 +38,7 @@ cicd-gh-action-monorepo/
 
 ## ⚡ Key Highlights & CI/CD Pipeline
 
-The GitHub Actions workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) implements production-grade monorepo best practices:
+The GitHub Actions workflow in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) implements production-grade monorepo best practices:
 
 - **Path Filtering (`dorny/paths-filter`):**
   - Changes in `be/**` trigger only the **Backend CI** job.

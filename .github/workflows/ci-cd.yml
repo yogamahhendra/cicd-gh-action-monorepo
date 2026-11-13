@@ -1,0 +1,186 @@
+name: Monorepo Prod CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # -----------------------------------------------------------
+  # 1. Path Filtering: Deteksi Folder Mana yang Mengalami Perubahan
+  # -----------------------------------------------------------
+  changes:
+    name: Detect Changed Folders
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Filter Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'be/**'
+              - '.github/workflows/ci-cd.yml'
+            frontend:
+              - 'fe/**'
+              - '.github/workflows/ci-cd.yml'
+
+  # -----------------------------------------------------------
+  # 2. Backend CI (Laravel) - Linting & Automated Tests
+  # -----------------------------------------------------------
+  backend-ci:
+    name: Backend CI (Laravel)
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: be
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, bcmath
+          coverage: none
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: be/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('be/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Prepare Environment & Key
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          mkdir -p storage/framework/{cache,sessions,views} storage/logs
+          chmod -R 777 storage bootstrap/cache
+
+      - name: Check Code Style (Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: Run Pest Tests
+        run: php artisan test
+
+  # -----------------------------------------------------------
+  # 3. Frontend CI (React Router v7) - Typecheck & Build
+  # -----------------------------------------------------------
+  frontend-ci:
+    name: Frontend CI (React Router)
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fe
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: fe/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Type Check
+        run: npm run typecheck
+
+      - name: Build Application
+        run: npm run build
+
+  # -----------------------------------------------------------
+  # 4. CD: Deploy ke Server Production via NetBird & SSH
+  # (HANYA berjalan jika branch main/master & semua CI yang aktif LULUS)
+  # -----------------------------------------------------------
+  deploy:
+    name: Deploy to Production
+    needs: [changes, backend-ci, frontend-ci]
+    if: |
+      always() &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      (needs.backend-ci.result == 'success' || needs.backend-ci.result == 'skipped') &&
+      (needs.frontend-ci.result == 'success' || needs.frontend-ci.result == 'skipped') &&
+      !(needs.backend-ci.result == 'skipped' && needs.frontend-ci.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Hubungkan runner ke NetBird VPN Mesh
+      - name: Connect to NetBird Mesh
+        run: |
+          echo "Installing NetBird client..."
+          curl -fsSL https://pkgs.netbird.io/install.sh | sudo sh
+          echo "Connecting to NetBird..."
+          sudo netbird up --setup-key ${{ secrets.NETBIRD_SETUP_KEY }}
+          echo "Checking NetBird connection status..."
+          netbird status
+
+      # Cek jangkauan jaringan ke IP server
+      - name: Verify Network Reachability
+        run: |
+          ping -c 3 ${{ secrets.SSH_HOST }} || echo "Ping skipped/blocked, continuing to SSH..."
+
+      # Eksekusi deployment via SSH
+      - name: Execute Deploy Commands via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            echo "=== 1. Pulling Latest Code ==="
+            cd /var/www/cicd-gh-action-monorepo
+            git pull origin main
+
+            # Deploy Backend jika be/ berubah atau trigger manual
+            if [ "${{ needs.changes.outputs.backend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "=== 2. Deploying Backend (Laravel) ==="
+              cd /var/www/cicd-gh-action-monorepo/be
+              composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+              php artisan migrate --force
+              php artisan config:cache
+              php artisan route:cache
+              php artisan view:cache
+              sudo systemctl reload php8.3-fpm || echo "PHP-FPM reloaded"
+            fi
+
+            # Deploy Frontend jika fe/ berubah atau trigger manual
+            if [ "${{ needs.changes.outputs.frontend }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "=== 3. Deploying Frontend (React Router) ==="
+              cd /var/www/cicd-gh-action-monorepo/fe
+              npm ci
+              npm run build
+              PORT=3001 pm2 reload fe-app --update-env || PORT=3001 pm2 start "npm start" --name "fe-app" --cwd /var/www/cicd-gh-action-monorepo/fe
+              pm2 save
+            fi
+
+            echo "=== Deployment Completed Successfully! ==="

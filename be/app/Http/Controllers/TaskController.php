@@ -18,7 +18,7 @@ class TaskController extends Controller
         return response()->json([
             'data' => Task::latest()->get(),
             'changes' => [
-                'message' => 'testing perubahan di ' . $lastModified,
+                'message' => 'testing perubahan di '.$lastModified,
             ],
         ]);
     }
